@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>chat world</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="/static/js/dayjs.min.js"></script>
+
+    <style>
+        html body {
+            background-color: #1F2020
+        }
+
+        .content {
+            height: 88vh;
+            margin: 0 auto;
+            border: #66ccff 1px solid;
+            overflow: auto;
+        }
+
+        .content::-webkit-scrollbar {
+            width: 0.5em; /* 设置滚动条宽度 */
+            height: 0.5em; /* 设置滚动条高度 */
+        }
+
+        .header {
+            height: 2vh;
+            margin: 0 auto;
+            text-align: start;
+            font-size: 8pt;
+            font-family: Monaco, "Courier New", Consolas, "Lucida Console", monospace;
+            color: #39c5bb;
+        }
+
+        @media screen and (max-width: 767px) {
+            /* 移动端样式 */
+            .content, .header {
+                width: 100%;
+            }
+
+            .input-div {
+                width: 100%;
+            }
+        }
+
+        @media screen and (min-width: 768px) {
+            /* 电脑端样式 */
+            .content, .header {
+                width: 800px;
+            }
+
+            .input-div {
+                width: 800px;
+            }
+        }
+
+        ul, ol {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            text-indent: 0;
+        }
+
+        .content ol {
+            width: 100%;
+            margin: 2px;
+        }
+
+        .content li {
+            min-height: 40px;
+            margin-bottom: 5px;
+
+
+        }
+
+        .ut {
+            width: 100%;
+            height: 25px;
+            line-height: 25px;
+            color: #e6e6e6;
+            font-family: "Courier New", Consolas, "Lucida Console", Monaco, monospace;
+        }
+
+
+        .user {
+            float: left;
+            margin-left: 10px;
+            padding: 0 5px 0 5px;
+            font-style: italic;
+            overflow: hidden;
+            max-width: 100px;
+            text-overflow: ellipsis;
+        }
+
+        .time {
+
+            font-size: x-small;
+            color: #838383;
+        }
+
+        .maohao {
+            font-style: italic;
+        }
+
+        .chat-content {
+            max-width: 80%;
+            display: inline-block;
+            width: auto;
+            min-height: 20px;
+            padding: 5px;
+            margin: 0 0 10px 10%;
+            border: #39c5bb 1px solid;
+            border-radius: 5px;
+            background-color: #1F2020;
+            color: #e6e6e6;
+            font-family: "Courier New", Consolas, "Lucida Console", Monaco, monospace;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+
+        .chat-self {
+            text-align: right;
+        }
+
+        .chat-self .user {
+            float: right;
+            margin-right: 10px;
+            color: #39c5bb;
+        }
+
+        .chat-self .time {
+            float: right;
+        }
+
+        .chat-self .chat-content {
+            margin: 0 10% 10px 0;
+            text-align: start;
+        }
+
+        .in-send {
+            border: #EE0999 1px dashed;
+        }
+
+        .input-div::-webkit-scrollbar {
+            width: 0.5em;
+            height: 0.5em;
+        }
+
+        .input-div {
+            display: flex;
+            justify-content: space-between;
+            height: 7vh;
+            margin: 0 auto;
+            border: #66ccff 1px solid;
+            border-top: none;
+            overflow: auto;
+        }
+
+        .chat-input {
+            width: 85%;
+            height: 80%;
+            background-color: transparent;
+            color: #fff9ec;
+            border: none;
+            resize: none;
+            font-size: x-large;
+        }
+
+        .chat-input:focus {
+            outline: none;
+        }
+
+        .chat-input::-webkit-scrollbar {
+            width: 0.5em;
+            height: 0.5em;
+        }
+
+        .send-bt {
+            height: 100%;
+            width: 70px;
+            background-color: transparent;
+            color: #fff9ec;
+        }
+
+        @keyframes blink {
+            0% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .blink {
+            color: #7fffff;
+            animation: blink 1s infinite;
+        }
+    </style>
+</head>
+<body th:room="${roomId}">
+<div class="header">
+    <span th:text="${roomId}"></span>|
+    <span>online number:</span>
+    <span id="user-number"></span>|
+    <span id="remind"></span>
+</div>
+<div class="content" id="content">
+    <ul id="chat-list">
+        <!--                <li class="chat">-->
+        <!--                    <div class="ut">-->
+        <!--                        <span class="user">light</span><span class="maohao">:</span>-->
+        <!--                        <span class="time">10/10 10:00:00</span>-->
+        <!--                    </div>-->
+        <!--                    <div class="chat-content">12312</div>-->
+        <!--                </li>-->
+        <!--                <li class="chat-self">-->
+        <!--                    <div class="ut">-->
+        <!--                        <span class="user">:light</span>-->
+        <!--                        <span class="time">10/10 10:00:00</span>-->
+        <!--                    </div>-->
+        <!--                        <div class="chat-content">12312</div>-->
+        <!--                </li>-->
+    </ul>
+</div>
+<div class="input-div">
+    <label for="info"></label><textarea class="chat-input" id="info"></textarea>
+    <button class="send-bt" id="bt-send">send</button>
+</div>
+<script>
+    var localStream;
+    var remoteStream;
+
+
+
+    function hasBlank(str) {
+        return /\s/.test(str)
+    }
+
+    const colors = new Set(["#0080FF", "#FF6699", "#eccc68",
+        "#2ed573", "#a29bfe", "#e056fd", "#ff7675",
+        "#ffb8b8", "#fff200", "#c35c5d", "#f6bec8",
+        "#c3d94e", "#2a6e3f", "#cc5d20", "#cf929e",
+        "#EE0000", "#00FFCC", "#FFFF00", "#9999FF"]
+    )
+    const userColor = new Set()
+    const color_user = new Map()
+    var room = document.body.getAttribute("room");
+    var chat_list = document.getElementById("chat-list");
+    var content = document.getElementById("content");
+    var username
+    var chat_socket
+
+    function sendChat() {
+        let info = document.getElementById("info").value;
+        if (info === "") {
+            return
+        }
+        let date = dayjs();
+        chat_list.appendChild(createMyChatItem(userName, info, date))
+        let msg = "##*" + JSON.stringify({
+            type: "chat",
+            msg: info,
+            time: date.format("YYYY-MM-DD HH:mm:ss"),
+            id: date.valueOf()
+        }) + "*##";
+        chat_socket.send(msg);
+        document.getElementById("info").value = ""
+        document.getElementById("info").focus()
+        scrollToBottom()
+    }
+
+    function init() {
+        userName = localStorage.getItem("userName");
+        while (userName == null || userName === "" || hasBlank(userName)) {
+            //弹出对话框要求输入用户名
+            userName = prompt("请输入昵称！(不能包含空白字符)");
+            if (!(userName === null || userName === "" || hasBlank(userName))) {
+                localStorage.setItem("userName", userName);
+                break
+            }
+        }
+        chat_socket = new WebSocket(`ws://${location.host}/ws/chat?chat_id=${room}&chat_name=${userName}`);
+        chat_socket.onopen = function () {
+        };
+        chat_socket.onmessage = function (msg) {
+            parsingResponse(msg.data)
+        };
+        chat_socket.onclose = function () {
+            console.log("websocket已关闭");
+        };
+        chat_socket.onerror = function () {
+            console.log("websocket发生了错误");
+        };
+        document.getElementById("bt-send").addEventListener("click", function () {
+            sendChat();
+        })
+
+        document.getElementById("info").addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                if (e.shiftKey)
+                    return
+                e.preventDefault()
+                sendChat()
+            }
+        })
+    }
+
+    function scrollToBottom() {
+        let scrollTop = content.scrollTop;
+        let scrollValue = content.scrollHeight - content.offsetHeight
+        let ds = (scrollValue - scrollTop) / 30
+        let timer = setInterval(function () {
+            if (scrollTop < scrollValue) {
+                scrollTop += ds;
+                content.scrollTop = scrollTop;
+            } else {
+                clearInterval(timer);
+            }
+        }, 10);
+    }
+
+    function randomColor() {
+        var letters = '0123456789ABCDEF';
+        var color = '#';
+        for (var i = 0; i < 6; i++) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+    }
+
+    function selectUserColor(user) {
+        if (color_user.has(user)) {
+            return color_user.get(user)
+        }
+        if (colors.size > 0) {
+            let color = colors.values().next().value
+            colors.delete(color)
+            userColor.add(color)
+            color_user.set(user, color)
+            return color
+        } else {
+            let color = randomColor()
+            if (userColor.has(color)) {
+                return selectUserColor(user)
+            }
+            userColor.add(color)
+            color_user.set(user, color)
+            return color
+        }
+    }
+
+    function createOtherChatItem(user, msg, time) {
+        let color = selectUserColor(user)
+        let li = document.createElement("li");
+        li.className = "chat";
+        let ut = document.createElement("div");
+        ut.className = "ut";
+        let userSpan = document.createElement("span");
+        userSpan.className = "user";
+        userSpan.style.color = color
+        userSpan.innerText = user;
+        let timeSpan = document.createElement("span");
+        timeSpan.className = "time";
+        timeSpan.innerText = time.format("HH:mm:ss MM/DD")
+        let maohao = document.createElement("span")
+        maohao.className = "maohao"
+        maohao.innerText = ":"
+        ut.appendChild(userSpan);
+        ut.appendChild(maohao);
+        ut.appendChild(timeSpan);
+        li.appendChild(ut);
+        let chat = document.createElement("div");
+        chat.className = "chat-content";
+        chat.style.borderColor = color
+        chat.setAttribute("chat_id", time.valueOf())
+        chat.innerText = msg;
+        li.appendChild(chat);
+        return li;
+    }
+
+    function createMyChatItem(user, msg, time) {
+        let li = document.createElement("li");
+        li.className = "chat-self";
+        let ut = document.createElement("div");
+        ut.className = "ut";
+        let userSpan = document.createElement("span");
+        userSpan.className = "user";
+        userSpan.innerText = ":" + user;
+        let timeSpan = document.createElement("span");
+        timeSpan.className = "time";
+        timeSpan.innerText = time.format("MM/DD HH:mm:ss");
+        ut.appendChild(userSpan);
+        ut.appendChild(timeSpan);
+        li.appendChild(ut);
+        let chat = document.createElement("div");
+        chat.className = "chat-content in-send";
+        chat.setAttribute("chat_id", time.valueOf())
+        chat.innerText = msg;
+        li.appendChild(chat);
+        return li;
+    }
+
+    init()
+    const mesRe = /^##\*\{.*}\*##$/;
+
+    function parsingResponse(msg) {
+        if (mesRe.test(msg)) {
+            let data = JSON.parse(msg.slice(3, -3));
+            let type = data["type"];
+            switch (type) {
+                case "chat":
+                    parseMessage(data["type"], data);
+                    break;
+                case "command":
+                    parseCommand(data["code"], data);
+                    break;
+                case "result":
+                    parseResult(data["#result"]);
+                    break;
+            }
+        } else console.log("未知消息格式")
+
+    }
+
+    function parseMessage(value, data) {
+        switch (value) {
+            case "chat":
+                chat_list.appendChild(createOtherChatItem(data["userName"], data["msg"], dayjs(data["time"])))
+                scrollToBottom()
+                break
+        }
+    }
+
+    function parseCommand(value, data) {
+        switch (value) {
+            case 500:
+            case 502:
+                alert(data["msg"]);
+                localStorage.removeItem("userName");
+                //刷新页面
+                location.reload();
+                break;
+            case 200:
+                let le = chat_list.querySelector(`.in-send[chat_id="${data["data"]}"]`);
+                if (le != null)
+                    le.classList.remove("in-send")
+                else
+                    setTimeout(function () {
+                        chat_list.querySelector(`.in-send[chat_id="${data["data"]}"]`)?.classList?.remove("in-send")
+                    }, 1000);
+                break;
+            case 201:
+            case 202:
+                document.getElementById("user-number").innerText = data["data"];
+                remind(data["msg"])
+                break;
+
+
+        }
+    }
+
+    var remindTimer = null;
+
+    function remind(meg) {
+        let remind = document.getElementById("remind")
+        remind.innerText = meg
+        remind.classList.add("blink")
+        clearTimeout(remindTimer)
+        remindTimer = setTimeout(function () {
+            remind.innerText = ""
+            remind.classList.remove("blink")
+        }, 5000)
+    }
+
+    function parseResult(data) {
+        let result = {}
+        for (let datum of data) {
+            let [key, value] = datum;
+            result[key] = value;
+        }
+        return result;
+    }
+
+</script>
+</body>
+</html>
